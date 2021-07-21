@@ -5,6 +5,7 @@ import time
 import tempfile
 from urllib.parse import urlparse
 from urllib.request import urlretrieve
+import logging
 
 import azure.functions as func
 import PIL
@@ -16,8 +17,8 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 
 class ThumbnailMakerService(object):
-    def __init__(self, home_dir='.'):
-        self.home_dir = tempfile.gettempdir()
+    def __init__(self):
+        self.home_dir = tempfile.mkdtemp()
         self.input_dir = self.home_dir + os.path.sep + 'incoming'
         self.output_dir = self.home_dir + os.path.sep + 'outgoing'
 
@@ -74,10 +75,8 @@ class ThumbnailMakerService(object):
         shutil.rmtree(self.output_dir)
 
 
-tn_maker = ThumbnailMakerService()
-
-
 def main(req: func.HttpRequest) -> func.HttpResponse:
+    tn_maker = ThumbnailMakerService()
     try:
         req_body = req.get_json()
     except ValueError:
