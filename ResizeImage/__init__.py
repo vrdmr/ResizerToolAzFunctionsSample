@@ -4,8 +4,7 @@ import ssl
 import time
 import tempfile
 from urllib.parse import urlparse
-from urllib.request import urlretrieve
-import logging
+import requests
 
 import azure.functions as func
 import PIL
@@ -17,7 +16,9 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 
 class ThumbnailMakerService(object):
-    def __init__(self):
+    def __init__(self, session: requests.Session):
+        self._session = session
+
         self.home_dir = tempfile.mkdtemp()
         self.input_dir = self.home_dir + os.path.sep + 'incoming'
         self.output_dir = self.home_dir + os.path.sep + 'outgoing'
@@ -31,7 +32,10 @@ class ThumbnailMakerService(object):
         start = time.perf_counter()
         # download each image and save to the input dir
         img_filename = urlparse(img_url).path.split('/')[-1]
-        urlretrieve(img_url, self.input_dir + os.path.sep + img_filename)
+        with open(self.input_dir + os.path.sep + img_filename, "wb") as img_file:
+            r = session.get(img_url)
+            img_file.write(r.content)
+
         end = time.perf_counter()
 
     def perform_resizing(self):
@@ -75,8 +79,15 @@ class ThumbnailMakerService(object):
         shutil.rmtree(self.output_dir)
 
 
+session = requests.Session()
+adapter = requests.adapters.HTTPAdapter(
+    pool_connections=100,
+    pool_maxsize=100)
+session.mount('http://', adapter)
+
+
 def main(req: func.HttpRequest) -> func.HttpResponse:
-    tn_maker = ThumbnailMakerService()
+    tn_maker = ThumbnailMakerService(session)
     try:
         req_body = req.get_json()
     except ValueError:
